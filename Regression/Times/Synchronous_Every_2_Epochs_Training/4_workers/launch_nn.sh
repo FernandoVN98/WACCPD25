@@ -17,7 +17,7 @@ enqueue_compss --log_level=off \
        --network=ethernet \
        --gen_coredump \
        --exec_time=120 \
-       --pythonpath=$PWD \
-       --worker_in_master_cpus=40 --max_tasks_per_node=80 --num_nodes=1 \
-       train_everything_distributed_2_workers.py
+       --pythonpath=$PWD:$PATH_TO_DISLIB \
+       --worker_in_master_cpus=0 --max_tasks_per_node=80 --num_nodes=2 \
+       train_everything_distributed_4_workers.py
 
