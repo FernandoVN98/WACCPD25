@@ -101,11 +101,7 @@ if __name__ == "__main__":
     # Original model timing
     num_epochs = 4
     # Get smaller model
-    print("IS IT USING PYTORCH CACHE?")
-    print(torch.backends.cudnn.enabled)
     torch_model, training_time = train_main_network(x_train, y_train, x_test, y_test)
-    print("IS IT USING PYTORCH CACHE?")
-    print(torch.backends.cudnn.enabled)
 
     train_data = []
     test_data = []

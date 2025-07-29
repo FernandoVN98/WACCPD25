@@ -5,10 +5,8 @@ import pandas as pd
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
-from dislib.preprocessing import MinMaxScaler
 import math
-from dislib.pytorch import EncapsulatedFunctionsDistributedPytorch
-from dislib.data.array import Array
+from dislib.pytorch.encapsulated_functions_distributed import EncapsulatedFunctionsDistributedPytorch
 from dislib.data.tensor import Tensor
 
 from pycompss.api.constraint import constraint
@@ -24,6 +22,7 @@ import time
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import csv
+import sys
 
 
 def process_outputs(output_nn):
@@ -41,11 +40,12 @@ def load_data(x_train, y_train, x_test, y_test):
     x_test = ds.from_pt_tensor(x_test, shape=(8, 1))
     y_test = torch.load(y_test)
     y_test = ds.from_pt_tensor(y_test, shape=(8, 1))
+    torch.cuda.empty_cache()
     return x_train, y_train, x_test, y_test
 
 
 def train_main_network(x_train, y_train, x_test, y_test):
-    encaps_function = EncapsulatedFunctionsDistributedPytorch(num_workers=4)
+    encaps_function = EncapsulatedFunctionsDistributedPytorch(num_workers=2)
     torch_model = NFNet().to("cuda:0")
     torch_model.apply(init_weights)
     criterion = nn.CrossEntropyLoss
@@ -54,11 +54,35 @@ def train_main_network(x_train, y_train, x_test, y_test):
     optimizer_parameters = {"lr": 0.1, "momentum": 0.9, "weight_decay":0.0001}
     indexes=128
     num_batches = math.ceil(x_train.tensor_shape[0]/indexes)
-    encaps_function.build(torch_model, optimizer, criterion, optimizer_parameters, scheduler=scheduler, T_max=100, eta_min=0, num_gpu=4, num_nodes=1) 
+    encaps_function.build(torch_model, optimizer, criterion, optimizer_parameters, scheduler=scheduler, T_max=100, eta_min=0, num_gpu=2, num_nodes=1) 
     start_time = time.time()
-    trained_weights = encaps_function.fit_synchronous_with_GPU(x_train, y_train, num_batches, 50) 
-    training_time = time.time() - start_time
+    trained_weights, train_loss, train_acc, validation_loss, val_acc = encaps_function.fit_asynchronous_with_GPU(x_train, y_train, num_batches, 50, shuffle_blocks=False, shuffle_block_data=False, return_loss=True, x_test=x_test, y_test=y_test) 
+    epochs = range(1, len(train_acc) + 1)
+    plt.plot(epochs, train_acc, label='Train Acc', marker='o')
+    plt.plot(epochs, val_acc, label='Validation Acc', marker='o')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.title('Train Accuracy vs Validation Accuracy')
+    plt.legend(loc='upper left', fontsize=10, frameon=True, shadow=True)
+    plt.savefig('train_val_accuracy.png')
+    plt.clf()
+    epochs = range(1, len(train_acc) + 1)
+    plt.plot(epochs, train_loss, label='Train Loss', marker='o')
+    plt.plot(epochs, validation_loss, label='Validation Loss', marker='o')
+    plt.xlabel('Epochs')
+    plt.ylabel('CrossEntropyLoss')
+    plt.title('Train Loss vs Validation Loss')
+    plt.savefig('train_val_loss.png')
     torch_model = assign_weights_to_model(torch_model, trained_weights)
+    training_time = time.time() - start_time
+    df = pd.DataFrame([train_loss])
+    df.to_csv("train_loss.csv", index=False, decimal=",", sep=";", quoting=csv.QUOTE_NONE)
+    df = pd.DataFrame([validation_loss])
+    df.to_csv("validation_loss.csv", index=False, decimal=",",sep=";", quoting=csv.QUOTE_NONE)
+    df = pd.DataFrame([train_acc])
+    df.to_csv("train_acc.csv", index=False, decimal=",", sep=";", quoting=csv.QUOTE_NONE)
+    df = pd.DataFrame([val_acc])
+    df.to_csv("validation_acc.csv", index=False, decimal=",", sep=";", quoting=csv.QUOTE_NONE)
     return torch_model, training_time
 
 
@@ -93,18 +117,15 @@ def evaluate_main_network(x_test, y_test, torch_model):
 
 
 if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_data("/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/train_valid/x_vt_64.pt", 
-            "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/train_valid/y_vt.pt", 
-            "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/test/x_test_64.pt", "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/test/y_test_one_hot_encoded.pt")
+    if len(sys.argv) < 5:
+        raise ValueError("Paths to train and test data should be provided")
+    x_train, y_train, x_test, y_test = load_data(sys.argv[1], 
+            sys.argv[2], sys.argv[3], sys.argv[4])
 
-    model_path = "./weights/mlp_mnist.pth"
     # Original model timing
-    num_epochs = 4
     # Get smaller model
     torch_model, training_time = train_main_network(x_train, y_train, x_test, y_test)
 
-    train_data = []
-    test_data = []
     print("Evaluate Original Accuracy, MSE or MAE", flush=True)
     print("Time used to train NN: " + str(training_time))
     evaluate_main_network(x_test, y_test, torch_model)
