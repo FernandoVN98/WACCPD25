@@ -32,3 +32,5 @@ The previous folders correspond to the experiments shown in Figure 3, with the a
 The folder: **./Times/32_workers_synchronous** contains the scripts to reproduce the results shown in Figure 4 of the article (execution times and speedup up to 32 workers). Then the folder **./Times/64_workers_asynchronous** contains the script to reproduce the values shown in Figure 5. Additionally, these experiments can be used to reproduce what is shown in Figure 8, just by changeng the number of partitions in which the training is loaded in the different executions.
 
 In order to reproduce the values shown in Figure 6, it is required to execute the scripts contained in: **./Times/Pytorch_DDP**, the execution of these scripts will return the times obtained using PyTorch DDP to train the neural network. The times shown in Figure 6 using our strategies correspond to the values obtained using the scripts in folder: **./Times/Asynchronous_Training**
+
+Finally, figure 7 can be replicated with the results obtained executing the scripts inside **./Times/Synchronous_Training**, with the partitions used by default in the training data, and changing the partitions to 16.
