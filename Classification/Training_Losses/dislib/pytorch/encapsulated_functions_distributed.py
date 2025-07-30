@@ -230,7 +230,7 @@ class EncapsulatedFunctionsDistributedPytorch(object):
                                                 num_epochs,
                                                 n_epocs_sync=1,
                                                 shuffle_blocks=True,
-                                                shuffle_block_data=True):
+                                                shuffle_block_data=True, x_test=None, y_test=None, return_loss=False):
         """
         Training of the neural network performing a syncrhonization every n
         specified epochs,  it performs a total shuffle of the tensors on the
@@ -263,14 +263,23 @@ class EncapsulatedFunctionsDistributedPytorch(object):
                                   for _ in range(self.num_workers)]
         rows = np.arange(x_train.shape[0])
         cols = np.arange(x_train.shape[1])
+        training_loss = []
+        training_acc = []
+        validation_acc = []
+        validation_loss = []
+        x_test_local = x_test.collect()
+        y_test_local = torch.cat([tens for tensor in y_test.collect() for tens in tensor])
+        _, y_test_one_hot_encoded = torch.max(y_test_local, dim=1)
         for i in range(num_epochs):
             j = 0
             if shuffle_blocks:
                 rows = np.random.permutation(x_train.shape[0])
                 cols = np.random.permutation(x_train.shape[1])
+            epoch_accuracy = []
+            epoch_loss = []
             for row in rows:
                 for col in cols:
-                    parameters_for_workers[j] = \
+                    parameters_for_workers[j], train_loss, train_accuracy = \
                         self.compss_object[j].train_cnn_batch_GPU(
                             parameters_for_workers[j],
                             x_train.tensors[int(row)][int(col)],
@@ -280,6 +289,20 @@ class EncapsulatedFunctionsDistributedPytorch(object):
                     j = j + 1
                     if j == self.num_workers:
                         j = 0
+                    epoch_loss.append(train_loss)
+                    epoch_accuracy.append(train_accuracy)
+            if self.scheduler is not None:
+                self.scheduler.step()
+                self.optimizer_parameters = {}
+                self.optimizer_parameters["lr"] = self.optimizer.param_groups[0]["lr"]
+                if "momentum" in self.optimizer.param_groups[0]:
+                    self.optimizer_parameters["momentum"] = self.optimizer.param_groups[0]["momentum"]
+                if "weight_decay" in self.optimizer.param_groups[0]:
+                    self.optimizer_parameters["weight_decay"] = self.optimizer.param_groups[0]["weight_decay"]
+            epoch_loss = compss_wait_on(epoch_loss)
+            epoch_accuracy = compss_wait_on(epoch_accuracy)
+            training_acc.append(np.array(epoch_accuracy).mean())
+            training_loss.append(np.array(epoch_loss).mean())
             if (i + 1) % n_epocs_sync == 0:
                 parameters_for_workers = compss_wait_on(
                     parameters_for_workers)
@@ -288,11 +311,41 @@ class EncapsulatedFunctionsDistributedPytorch(object):
                 parameters_for_workers = [
                     copy.deepcopy(self.model_parameters) for _
                     in range(len(parameters_for_workers))]
+                assign_parameters(self.compss_object[0].model, self.model_parameters)
+                torch_model = self.compss_object[0].model
+                total_loss = 0.0
+                if x_test is not None:
+                    torch_model = torch_model.eval().to("cuda:0")
+                    indexes = 128
+                    num_batches = math.ceil(x_test[0][0].tensor_shape[0]/indexes)
+                    outputs = []
+                    for x_out_tens in x_test_local:
+                        for x_in_tens in x_out_tens:
+                            x_in_tens = x_in_tens.to("cuda:0")
+                            for idx in range(num_batches):
+                                with torch.no_grad():
+                                    output = torch_model(x_in_tens[idx * indexes: (idx + 1) *indexes].float())
+                                    output_cpu = output.cpu()
+                                    outputs.append(output_cpu)
+                                    del output
+                                torch.cuda.empty_cache()
+                            x_in_tens = x_in_tens.to("cpu")
+                            del x_in_tens
+                            torch.cuda.empty_cache()
+                    outputs = torch.cat(outputs)
+                    loss = nn.CrossEntropyLoss()
+                    validation_loss.append(loss(outputs, y_test_one_hot_encoded).item())
+                    outputs = process_outputs(outputs)
+                    outputs = outputs.detach().cpu().numpy()
+                    validation_acc.append(accuracy_score(y_test_local, outputs))
         parameters_for_workers = compss_wait_on(parameters_for_workers)
         self.model_parameters = pt_aggregateParameters(
             parameters_for_workers)
-        return self.model_parameters
-    
+        if return_loss:
+            return parameters_for_workers[0], training_loss, training_acc, validation_loss, validation_acc
+        else:
+            return parameters_for_workers[0]
+
     def fit_synchronous_with_GPU(self, x_train, y_train,
                                  num_batches_per_worker,
                                  num_epochs,

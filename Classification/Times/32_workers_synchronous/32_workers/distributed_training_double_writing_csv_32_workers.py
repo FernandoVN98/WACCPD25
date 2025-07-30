@@ -104,14 +104,10 @@ if __name__ == "__main__":
     
     x_train, y_train, x_test, y_test = load_data(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
 
-    model_path = "./weights/mlp_mnist.pth"
     # Original model timing
-    num_epochs = 4
     # Get smaller model
     torch_model, training_time = train_main_network(x_train, y_train, x_test, y_test)
 
-    train_data = []
-    test_data = []
     print("Evaluate Original Accuracy, MSE or MAE", flush=True)
     print("Time used to train NN: " + str(training_time))
     evaluate_main_network(x_test, y_test, torch_model)

@@ -10,7 +10,7 @@ import math
 from dislib.pytorch import EncapsulatedFunctionsDistributedPytorch
 from dislib.data.array import Array
 from dislib.data.tensor import Tensor
-
+import sys
 from pycompss.api.constraint import constraint
 from pycompss.api.parameter import Type, Depth, \
     INOUT, IN, COLLECTION_OUT, COLLECTION_IN
@@ -93,18 +93,16 @@ def evaluate_main_network(x_test, y_test, torch_model):
 
 
 if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_data("/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/train_valid/x_vt_64.pt", 
-            "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/train_valid/y_vt.pt", 
-            "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/test/x_test_64.pt", "/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/Dataset/test/y_test_one_hot_encoded.pt")
+    if len(sys.argv) < 5:
+        raise ValueError("Paths to train and test data should be provided")
+    x_train, y_train, x_test, y_test = load_data(sys.argv[1],
+            sys.argv[2],
+            sys.argv[3], sys.argv[4])
 
-    model_path = "./weights/mlp_mnist.pth"
     # Original model timing
-    num_epochs = 4
     # Get smaller model
     torch_model, training_time = train_main_network(x_train, y_train, x_test, y_test)
 
-    train_data = []
-    test_data = []
     print("Evaluate Original Accuracy, MSE or MAE", flush=True)
     print("Time used to train NN: " + str(training_time))
     evaluate_main_network(x_test, y_test, torch_model)

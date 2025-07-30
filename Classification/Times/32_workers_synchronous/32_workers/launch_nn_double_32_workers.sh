@@ -15,10 +15,9 @@ enqueue_compss --log_level=off \
        --worker_working_dir=${PWD} \
        --log_dir=${PWD} \
        --network=ethernet \
-       --job_dependency=24546060 \
        --gen_coredump \
        --exec_time=70 \
-       --pythonpath=$PWD:/gpfs/scratch/bsc19/bsc019756/Neural_Network_With_GLAI/Classification/NFNet-F0_measure_time/synchronous_times \
+       --pythonpath=$PWD:$PATH_TO_DISLIB \
        --worker_in_master_cpus=0 --max_tasks_per_node=80 --num_nodes=9 \
-       distributed_training_double_writing_csv_32_workers_double_size_tensors.py
+       distributed_training_double_writing_csv_32_workers_double_size_tensors.py $1 $2 $3 $4
 
