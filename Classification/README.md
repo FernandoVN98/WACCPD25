@@ -5,6 +5,12 @@ into PyTorch tensors that were used in the experiments.
 
 There are two more folders: **Training_Losses** and **Times**
 
+## Generate Dataset
+
+This folder contains the script used to generate the dataset of the experiments. We used both validation and training data as training data. We used the test data to measure the reported accuracies of the different experiments. In order to create the dataset it is required to execute the script like:
+
+$ python3 transform_dataset.py $PATH_TO_CINIC10 $PATH_WHERE_STORE_TRAIN_TEST_DATA
+
 ## Training Losses
 The experiments contained in this folder try to replicate the figures containing the training losses contained inside the folder **Figures** and in the article. The scripts inside **./Training_Losses/Asynchronous_Training/** are the ones used to obtain the data that is shown in Figure 2 in the article. 
 In order to reproduce any of these experiments one should go inside the corresponding folder, f. example:
