@@ -13,7 +13,11 @@ It is required to have access to a large number of GPUs, some of the experiments
 
 ### Software
 
+The Python version used to execute the experiments was Python '3.12.1'. One software package required is PyTorch, version '2.3.0+cu121'. This can be installed using the command:
 
+$ python3 -m pip install torch==2.3.0+cu121
+
+Finally, the last software requirement is PyCOMPSs version '3.3.3'. The installation steps are clearly in [COMPSs documentation page](https://compss-doc.readthedocs.io/en/stable/Sections/01_Installation.html)
 
 ### Data
 
@@ -21,6 +25,14 @@ The dataset used in the Classification experiments is publicly available. It has
 
 ## Execution
 
+In order to execute any of the experiments once the requirements are installed it is only needed to execute the corresponding bash script specifying the paths to the data. For example with the classification problem:
+
+$ ./launch_nn_double.sh $PATH_TO_X_TRAIN $PATH_TO_Y_TRAIN $PATH_TO_X_TEST $PATH_TO_Y_TEST
+
 ## Classification
 
+This folder contains the classification experiments that are shown in the article.
+
 ## Regression
+
+This folder contains the regression experiments shown in the article. It corresponds to the federated training part of the article.
